@@ -12,9 +12,6 @@ export class Scene {
     this._box = new THREE.Box3();
   }
 
-  /**
-   * The bounding box of the visibile objects in this secene
-   */
   get box() {
     this._scene.updateMatrixWorld(true);
     this._box.setFromObject(this._scene);
@@ -38,34 +35,21 @@ export class Scene {
         (obj as THREE.Points).isPoints
       ) {
         const object3D = obj as THREE.Object3D;
-
-        // 确保 worldMatrix 最新
         object3D.updateMatrixWorld(true);
-
-        // 烘焙 worldMatrix 到 geometry
         const geometry = (object3D as any).geometry as THREE.BufferGeometry;
         if (geometry) {
-          // 构造平移矩阵，使中心点归零
           const translationMatrix = new THREE.Matrix4().makeTranslation(-origin.x, -origin.y, 0);
-
-          // 烘焙 transform
           geometry.applyMatrix4(object3D.matrix);
           geometry.applyMatrix4(translationMatrix);
-
-          // 更新几何体
           geometry.computeBoundingBox();
           geometry.computeBoundingSphere();
         }
-
-        // 重置对象 transform
         object3D.position.set(0, 0, 0);
         object3D.rotation.set(0, 0, 0);
         object3D.scale.set(1, 1, 1);
         object3D.updateMatrix();
       }
     });
-
-    // 3. 重置 rootGroup transform
     rootGroup.position.set(0, 0, 0);
     rootGroup.rotation.set(0, 0, 0);
     rootGroup.scale.set(1, 1, 1);
