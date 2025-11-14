@@ -1,0 +1,21 @@
+{
+  "name": "large-coordinate-rendering-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc && vite build",
+    "dev": "vite",
+    "format": "prettier --write \"src/**/*.{ts,js,json,css,html}\"",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/three": "^0.181.0",
+    "prettier": "^3.6.2",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.2"
+  },
+  "dependencies": {
+    "three": "^0.181.1"
+  }
+}
