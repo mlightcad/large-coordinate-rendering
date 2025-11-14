@@ -1,70 +1,61 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Camera } from './camera';
+import { Scene } from './scene';
 
 export class View2d {
-  private _camera: THREE.OrthographicCamera;
-  private _cameraControls: THREE.OrbitControls;
+  protected _frustum = 400;
+  protected _canvas: HTMLCanvasElement;
+  private _width: number;
+  private _height: number;
+  private _camera: Camera;
+  private _cameraControls: OrbitControls;
   private _renderer: THREE.WebGLRenderer;
-  private _scene: THREE.Scene;
-  private _isDirty: boolean;
+  private _scene: Scene;
 
-  constructor() {
+  constructor(canvas: HTMLCanvasElement) {
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true,
+      canvas,
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     this._renderer = renderer;
-    _camera: THREE.OrthographicCamera;
-    this._scene = new THREE.Scene();
+
+    this._canvas = renderer.domElement;
+    const rect = this._canvas.getBoundingClientRect();
+    this._width = rect.width;
+    this._height = rect.height;
+
+    const camera = this.createCamera();
+    this._camera = new Camera(camera);
+    this._cameraControls = this.createCameraControls();
+
+    this._scene = new Scene();
     this.animate();
-    this._isDirty = true;
+
+    window.addEventListener('resize', this.onWindowResize.bind(this));
   }
 
-  get isDirty() {
-    return this._isDirty;
-  }
-  set isDirty(value: boolean) {
-    this._isDirty = value;
+  add(object: THREE.Object3D) {
+    this._scene.add(object);
   }
 
   animate() {
     requestAnimationFrame(this.animate.bind(this));
-    if (this._isDirty) {
-      this._isDirty = false;
-    }
-  }
-
-  zoomTo(box: AcGeBox2d, margin: number = 1.1) {
-    this._isDirty = true;
-  }
-
-  zoomToFit(timeout: number = 0) {
-    const waiter = new AcEdConditionWaiter(
-      () => this._numOfEntitiesToProcess <= 0,
-      () => {
-        if (this._scene.box) {
-          const box = AcTrGeometryUtil.threeBox3dToGeBox2d(this._scene.box);
-          this.zoomTo(box);
-          this._isDirty = true;
-        }
-      },
-      300, // check every 200 ms
-      timeout
-    );
-    waiter.start();
+    this._renderer.render(this._scene.internalScene, this._camera.internalCamera);
   }
 
   clear() {
     this._scene.clear();
   }
 
-  zoomTo(box: AcGeBox2d, margin: number = 1.1) {
-    const size = new AcGeVector2d();
+  zoomTo(box: THREE.Box3, margin: number = 1.1) {
+    const size = new THREE.Vector3();
     box.getSize(size);
 
-    const center = new AcGeVector2d();
+    const center = new THREE.Vector3();
     box.getCenter(center);
 
     const threeCenter = new THREE.Vector3(center.x, center.y, 0);
@@ -82,6 +73,12 @@ export class View2d {
     this.updateCameraFrustum();
   }
 
+  zoomToFit() {
+    const box = this._scene.box;
+    // this._scene.moveToCenter()
+    this.zoomTo(box);
+  }
+
   protected updateCameraFrustum(width?: number, height?: number) {
     const aspect = (width ?? this._width) / (height ?? this._height);
     this._camera.left = -aspect * this._frustum;
@@ -90,6 +87,11 @@ export class View2d {
     this._camera.bottom = -this._frustum;
     this._camera.updateProjectionMatrix();
     this._cameraControls.update();
+  }
+
+  protected onWindowResize() {
+    this._width = this._canvas.clientWidth;
+    this._height = this._canvas.clientHeight;
   }
 
   private createCamera() {
