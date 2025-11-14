@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Camera } from './camera';
 import { Scene } from './scene';
+import type { Drawing } from './drawing';
 
 export class View2d {
   protected _frustum = 400;
@@ -12,8 +13,13 @@ export class View2d {
   private _cameraControls: OrbitControls;
   private _renderer: THREE.WebGLRenderer;
   private _scene: Scene;
+  private _drawing: Drawing;
+  /** Current mouse position in world coordinates */
+  private _curPos: THREE.Vector2;
+  /** Current mouse position in screen coordinates */
+  private _curScreenPos: THREE.Vector2;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, drawing: Drawing) {
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true,
@@ -24,6 +30,8 @@ export class View2d {
     this._renderer = renderer;
 
     this._canvas = renderer.domElement;
+    this._canvas.addEventListener('mousemove', (event) => this.onMouseMove(event));
+
     const rect = this._canvas.getBoundingClientRect();
     this._width = rect.width;
     this._height = rect.height;
@@ -32,14 +40,26 @@ export class View2d {
     this._camera = new Camera(camera);
     this._cameraControls = this.createCameraControls();
 
+    this._drawing = drawing;
     this._scene = new Scene();
+    this._scene.add(drawing.rootGroup);
     this.animate();
 
+    this._curPos = new THREE.Vector2();
+    this._curScreenPos = new THREE.Vector2();
     window.addEventListener('resize', this.onWindowResize.bind(this));
   }
 
-  add(object: THREE.Object3D) {
-    this._scene.add(object);
+  get canvas() {
+    return this._canvas;
+  }
+
+  get camera() {
+    return this._camera;
+  }
+
+  get scene() {
+    return this._scene;
   }
 
   animate() {
@@ -49,6 +69,13 @@ export class View2d {
 
   clear() {
     this._scene.clear();
+  }
+
+  rebase() {
+    const box = this._scene.box;
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    this._drawing.basePoint = new THREE.Vector2(center.x, center.y);
   }
 
   zoomTo(box: THREE.Box3, margin: number = 1.1) {
@@ -75,8 +102,17 @@ export class View2d {
 
   zoomToFit() {
     const box = this._scene.box;
-    // this._scene.moveToCenter()
     this.zoomTo(box);
+  }
+
+  cwcs2Wcs(point: THREE.Vector2Like): THREE.Vector2 {
+    const wcsPt = this._camera.cwcs2Wcs(point, this._width, this._height);
+    return wcsPt.add(this._drawing.basePoint);
+  }
+
+  wcs2Cwcs(point: THREE.Vector2Like): THREE.Vector2 {
+    const cwcsPt = this._camera.wcs2Cwcs(point, this._width, this._height);
+    return cwcsPt.add(this._drawing.basePoint);
   }
 
   protected updateCameraFrustum(width?: number, height?: number) {
@@ -92,6 +128,12 @@ export class View2d {
   protected onWindowResize() {
     this._width = this._canvas.clientWidth;
     this._height = this._canvas.clientHeight;
+  }
+
+  private onMouseMove(event: MouseEvent) {
+    this._curScreenPos = new THREE.Vector2(event.clientX, event.clientY);
+    const wcsPos = this.cwcs2Wcs(this._curScreenPos);
+    this._curPos.copy(wcsPos);
   }
 
   private createCamera() {
